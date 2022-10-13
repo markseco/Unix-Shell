@@ -8,6 +8,9 @@
 #include <fcntl.h>
 #include <time.h>
 #include <sys/utsname.h>
+#include <sys/stat.h>
+#include <pwd.h>
+#include <grp.h>
 #include "head_list.h"
 
 void cmd_autores(char * tr []);
@@ -20,6 +23,10 @@ void cmd_command(char * tr[], tList *L);
 void cmd_fecha(char * tr[]);
 void cmd_infosis(char *tr[]);
 void cmd_create(char *tr[]);
+char LetraTF (mode_t m);
+char * ConvierteModo (mode_t m, char *permisos);
+void cmd_stat(char *tr[]);
+void cmd_list(char *tr[]);
 void ProcesarEntrada(char * tr[], tList * L);
 int TrocearCadena(char * cadena, char * trozos[]);
 
@@ -39,8 +46,9 @@ struct CMD c[]={
         {"fecha", "It prints both the current date and the current time.\n fecha -d: prints the current date.\n fecha -h prints the current time", cmd_fecha},
         {"infosis", "Prints information on the machine runnig the shell", cmd_infosis},
         {"create", "create [-f] [name]	Crea un directorio o un fichero (-f)", cmd_create},
-        {NULL, NULL,NULL},
-
+        {"stat", "stat [-long] [-acc] [-link] name1 name2 ... listaficheros; \n\t\t\t-long: listado largo \n\t\t\t-acc: acesstime\n\t\t\t-link: if is a symbolic link, the path is contained", cmd_stat},
+        {"list", "list [-reca] [-recb] [-hid] [-long] [-acc] [-link] n1 n2 ... contentlist; \n\t\t\t-hid:includes hidden files\n\t\t\t-reca: recursive (before) \n\t\t\t-recb: recursive (after)\n\t\t\trest of parameters as in stat." ,cmd_list},
+        {NULL, NULL,NULL}
 };
 
 void cmd_autores(char * tr []){
@@ -86,7 +94,7 @@ void cmd_pid(char * tr[]){
 void cmd_carpeta(char * tr[]){
     char dir[MAX];
     if(tr[0]==NULL){
-    //shows the current directory
+    //shows the current working directory
         printf("%s", getcwd(dir, MAX));
         printf("\n");
     }
@@ -245,7 +253,8 @@ void cmd_command(char *tr[], tList *L){
 void cmd_create(char *tr[]){
 	if(tr[0] == NULL){
 		//if no name for the directory is spacified then the current working directory is printed on the screen
-		cmd_carpeta(NULL);
+		//cmd_carpeta(NULL); preguntar porque no va
+		printf("Error: lack of parameters.\n");
 		return;
 	}
 	
@@ -280,7 +289,138 @@ void cmd_create(char *tr[]){
 	}
 	
 }
+
+
+
+
+
+char LetraTF (mode_t m)
+{
+     switch (m&S_IFMT) { /*and bit a bit con los bits de formato,0170000 */
+        case S_IFSOCK: return 's'; /*socket */
+        case S_IFLNK: return 'l'; /*symbolic link*/
+        case S_IFREG: return '-'; /* fichero normal*/
+        case S_IFBLK: return 'b'; /*block device*/
+        case S_IFDIR: return 'd'; /*directorio */ 
+        case S_IFCHR: return 'c'; /*char device*/
+        case S_IFIFO: return 'p'; /*pipe*/
+        default: return '?'; /*desconocido, no deberia aparecer*/
+     }
+}
+
+
+char * ConvierteModo (mode_t m, char *permisos)
+{
+    strcpy (permisos,"---------- ");
+    
+    permisos[0]=LetraTF(m);
+    if (m&S_IRUSR) permisos[1]='r';    /*propietario*/
+    if (m&S_IWUSR) permisos[2]='w';
+    if (m&S_IXUSR) permisos[3]='x';
+    if (m&S_IRGRP) permisos[4]='r';    /*grupo*/
+    if (m&S_IWGRP) permisos[5]='w';
+    if (m&S_IXGRP) permisos[6]='x';
+    if (m&S_IROTH) permisos[7]='r';    /*resto*/
+    if (m&S_IWOTH) permisos[8]='w';
+    if (m&S_IXOTH) permisos[9]='x';
+    if (m&S_ISUID) permisos[3]='s';    /*setuid, setgid y stickybit*/
+    if (m&S_ISGID) permisos[6]='s';
+    if (m&S_ISVTX) permisos[9]='t';
+    
+    return permisos;
+}
+
+
+void cmd_stat(char *tr[]){
 	
+	struct stat buffer;
+	char acctime[100];
+	struct passwd *uname;
+	struct group *gname;
+	char permissions[12];
+	bool lon = false;
+	bool acc = false;
+	bool link = false;
+	
+	
+	while((tr[0] != NULL)){
+		
+		if(!strcmp(tr[0], "-long"))
+			lon = true;
+		else if (!strcmp(tr[0], "-acc"))
+			acc = true;
+		else if (!strcmp(tr[0], "-link"))
+			link = true;
+		else 
+			break;
+		tr = tr + 1;
+	}
+	
+	
+	if(tr[0] == NULL || (!lon && !acc && !link)){
+		printf("ERROR: Wrong parameters.\n");
+		//cmd_carpeta(NULL); preguntar por que no funciona
+	
+		return;	
+	}
+	
+	
+	while(tr[0] != NULL){
+		
+		if(lstat(tr[0], &buffer) == -1){
+			perror("ERROR");
+			tr = tr + 1;
+			
+			if(tr[0] != NULL)
+				continue;
+			else
+				return;
+		}
+		
+		
+		//here we get the string of the permissions 
+		ConvierteModo (buffer.st_mode, permissions);
+		permissions[0] = LetraTF(buffer.st_mode);
+		
+		//here we transform the last accestime to a string
+		strftime(acctime, 100, "%Y/%m/%d-%H:%M",localtime(&buffer.st_atime));
+		
+		
+		if(lon){
+			
+			//here we get the user name and the goupname
+			if((uname = getpwuid(buffer.st_uid)) == NULL){
+				printf("Error obtaining the username\n");
+				return;
+			}
+			if((gname = getgrgid(buffer.st_gid)) == NULL){
+				printf("Error obtaining the groupname\n");
+				return;
+			}
+			//we print the information
+			printf("%s \t %ld \t (%ld) \t %s \t %s \t %s \t %ld\t %s\n",
+			 acctime, buffer.st_nlink, buffer.st_ino, uname->pw_name, gname->gr_name, permissions, buffer.st_size, tr[0]);
+			
+		}else{
+			if(acc)
+				printf("%s", acctime);
+			if(link)
+				printf("preguntar q hacer\n");
+		}
+		
+		
+		tr = tr + 1;
+	}
+	
+	
+}
+	
+
+void cmd_list(char *tr[]){
+	
+
+}
+
 
 void cmd_fin(char * tr [], tList *L){
     clearList(L);
@@ -331,6 +471,9 @@ void ProcesarEntrada(char * tr[], tList * L){
 
     }
 }
+
+
+
 
 int main( int argc, char * argv [] ){
     char entrada[MAX];
