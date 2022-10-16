@@ -11,6 +11,8 @@
 #include <sys/stat.h>
 #include <pwd.h>
 #include <grp.h>
+#include <dirent.h>
+#include <errno.h>
 #include "head_list.h"
 
 void cmd_autores(char * tr []);
@@ -25,8 +27,12 @@ void cmd_infosis(char *tr[]);
 void cmd_create(char *tr[]);
 char LetraTF (mode_t m);
 char * ConvierteModo (mode_t m, char *permisos);
+
 void cmd_stat(char *tr[]);
 void cmd_list(char *tr[]);
+void cmd_delete(char *tr[]);
+void aux_deltree(char *path);
+void cmd_deltree(char *tr[]);
 void ProcesarEntrada(char * tr[], tList * L);
 int TrocearCadena(char * cadena, char * trozos[]);
 
@@ -38,6 +44,19 @@ struct CMD{
     void (*func)(char **);
 };
 
+//definition of the structure that is used to store the parameters that are passed to the functions cmd_stat and cmd_list
+typedef struct sl_params{
+	bool lon;
+	bool acc;
+	bool link;
+	bool hid; 
+	bool reca;
+	bool recb;
+	bool exterior_path;
+	int start_of_files;
+
+}sl_params;
+
 struct CMD c[]={
         {"autores","Prints the names and logins of the program authors",cmd_autores},
         {"carpeta","Changes the current working directoyof the shell",cmd_carpeta},
@@ -48,6 +67,8 @@ struct CMD c[]={
         {"create", "create [-f] [name]	Crea un directorio o un fichero (-f)", cmd_create},
         {"stat", "stat [-long] [-acc] [-link] name1 name2 ... listaficheros; \n\t\t\t-long: listado largo \n\t\t\t-acc: acesstime\n\t\t\t-link: if is a symbolic link, the path is contained", cmd_stat},
         {"list", "list [-reca] [-recb] [-hid] [-long] [-acc] [-link] n1 n2 ... contentlist; \n\t\t\t-hid:includes hidden files\n\t\t\t-reca: recursive (before) \n\t\t\t-recb: recursive (after)\n\t\t\trest of parameters as in stat." ,cmd_list},
+        {"deltree", "deltree [name1 name2 ...] deletes non empty directories recursively", cmd_deltree},
+        {"delete", "delete [name1 name2 ...] deletes files and empty directories", cmd_delete},
         {NULL, NULL,NULL}
 };
 
@@ -330,6 +351,63 @@ char * ConvierteModo (mode_t m, char *permisos)
     return permisos;
 }
 
+sl_params aux_stat_list(char *tr[]){
+	//this function returns a structure of type sl_params 
+	
+	sl_params ret;
+	ret.lon = false;
+	ret.acc = false;
+	ret.link = false;
+	ret.hid = false;
+	ret.reca = false;
+	ret.recb = false;
+	ret.start_of_files = 0;
+	
+	while(tr[0] != NULL){
+		if(tr[0][0] != '-')
+			return ret;
+		else if(!strcmp("-long", tr[0]))
+			ret.lon = true;
+		else if(!strcmp("-acc", tr[0]))
+			ret.acc = true;
+		else if(!strcmp("-link", tr[0]))
+			ret.link = true;
+		else if(!strcmp("-hid", tr[0]))
+			ret.hid = true;
+		else if(!strcmp("-reca", tr[0]))
+			ret.reca = true;
+		else if(!strcmp("-recb", tr[0]))
+			ret.recb = true;
+		
+		ret.start_of_files++;	
+		tr = tr + 1;
+	}
+	
+	return ret;
+}
+
+
+void format_dir_output(char *tr, char *t){
+	int i = strlen(tr);
+	int j = i;
+	int endt = 0;
+	
+	while(tr[j] != '/'){
+		j--;
+		if(j < 0)
+			return;
+	}
+	
+	while(j <= i){
+		t[0] = tr[j];
+		endt++;
+		j++;
+	}
+	
+	
+}
+
+
 
 void cmd_stat(char *tr[]){
 	
@@ -338,27 +416,13 @@ void cmd_stat(char *tr[]){
 	struct passwd *uname;
 	struct group *gname;
 	char permissions[12];
-	bool lon = false;
-	bool acc = false;
-	bool link = false;
+	sl_params params;
 	
+	params = aux_stat_list(tr);
+	tr = tr + params.start_of_files;
 	
-	while((tr[0] != NULL)){
-		
-		if(!strcmp(tr[0], "-long"))
-			lon = true;
-		else if (!strcmp(tr[0], "-acc"))
-			acc = true;
-		else if (!strcmp(tr[0], "-link"))
-			link = true;
-		else 
-			break;
-		tr = tr + 1;
-	}
-	
-	
-	if(tr[0] == NULL || (!lon && !acc && !link)){
-		printf("ERROR: Wrong parameters.\n");
+	if(tr[0] == NULL){
+		printf("ERROR: NO parameters.\n");
 		//cmd_carpeta(NULL); preguntar por que no funciona
 	
 		return;	
@@ -386,26 +450,33 @@ void cmd_stat(char *tr[]){
 		strftime(acctime, 100, "%Y/%m/%d-%H:%M",localtime(&buffer.st_atime));
 		
 		
-		if(lon){
+		// char *t = NULL;
+		//format_dir_output(tr[0], t); arreglar la funcion
+		
+		if(params.lon){
 			
 			//here we get the user name and the goupname
 			if((uname = getpwuid(buffer.st_uid)) == NULL){
 				printf("Error obtaining the username\n");
 				return;
 			}
+			
 			if((gname = getgrgid(buffer.st_gid)) == NULL){
 				printf("Error obtaining the groupname\n");
 				return;
 			}
 			//we print the information
-			printf("%s \t %ld \t (%ld) \t %s \t %s \t %s \t %ld\t %s\n",
+			
+			printf("%s \t %ld \t (%ld) \t %s \t %s \t %s \t %ld \t %s\n",
 			 acctime, buffer.st_nlink, buffer.st_ino, uname->pw_name, gname->gr_name, permissions, buffer.st_size, tr[0]);
 			
 		}else{
-			if(acc)
+			if(params.acc)
 				printf("%s", acctime);
-			if(link)
+			if(params.link)
 				printf("preguntar q hacer\n");
+			else
+				printf("%s\n", tr[0]);
 		}
 		
 		
@@ -414,12 +485,265 @@ void cmd_stat(char *tr[]){
 	
 	
 }
-	
 
-void cmd_list(char *tr[]){
+
+
+
+void sl_params_to_tr(sl_params params,  char * path, char * tro[]){
+	char str[MAX] = "";
 	
+	if(params.lon){
+		strcat(str, " -long");
+	}
+	
+	if(params.acc){
+		strcat(str, " -acc");
+	}
+	
+	if(params.link){
+		strcat(str, " -link");
+	}
+	
+	strcat(str, " ");
+	strcat(str, path);
+	
+	if(TrocearCadena(str, tro) == 0)
+		printf("Error at processing the string in the function sl_params_to_tr");
+	
+}
+
+
+int lstat_check(char *path, struct stat *st){
+		
+	if(lstat(path, st) == -1) {
+		printf("Could not access %s: %s\n", path, strerror(errno));
+	        return -1;    
+	}
+	
+	return 0;
+}
+
+
+void print_dir(sl_params params, char *path_name){
+
+	struct stat st;
+	char *tro[1];
+	
+	//gets the status of the path and if it can not it specifies the error and exits the funtion
+	if(lstat_check(path_name, &st) == -1)
+		return;
+	printf("**************%s\n", path_name);
+
+	
+	if((st.st_mode & S_IFMT) == S_IFDIR) { // path es un directorio
+		DIR *d;
+		struct dirent *ent;
+
+		if((d = opendir(path_name)) == NULL) {
+			printf("Could not open %s: %s\n", path_name, strerror(errno));
+			return;
+		}
+		
+		//in this while loop we read the elements that are in a directory
+		while((ent = readdir(d)) != NULL) {
+			char new_path[MAX];
+			if(ent->d_name[0] == '.' && !params.hid)//we ignore hidden directories if we are't asked to show them
+				continue;
+			
+			sprintf(new_path, "%s/%s", path_name, ent->d_name);
+			sl_params_to_tr(params, new_path, tro);
+			cmd_stat(tro);
+			
+		}
+		
+		
+		closedir(d);
+		
+	}else{  
+		sl_params_to_tr(params, path_name, tro);
+		cmd_stat(tro);
+	}
+	
+}
+
+
+
+void reca(sl_params params, char *path_name){
+	
+	struct stat st;
+	
+	//gets the status of the path and if it can not it specifies the error and exits the funtion
+	if(lstat_check(path_name, &st) == -1)
+		return;
+	
+	
+	print_dir(params, path_name);
+	
+	if((st.st_mode & S_IFMT) == S_IFDIR) { // path es un directorio
+		DIR *d;
+		struct dirent *ent;
+
+		if((d = opendir(path_name)) == NULL) {
+			printf("Could not open %s: %s\n", path_name, strerror(errno));
+			return;
+		}
+		
+		//in this while loop we read the elements that are in a directory
+		while((ent = readdir(d)) != NULL) {
+			char new_path[MAX];
+			if(strcmp(ent->d_name, ".") == 0 || strcmp(ent->d_name, "..") == 0)//we ignore these directories
+				continue;
+			if(ent->d_type != DT_DIR)
+				continue;
+			
+			
+			sprintf(new_path, "%s/%s", path_name, ent->d_name);
+			reca(params, new_path);
+			
+		}
+		
+		
+		closedir(d);
+		
+	}
+}
+
+
+void recb(sl_params params, char *path_name){
+		struct stat st;
+		char new_path[MAX];
+	
+	//gets the status of the path and if it can not it specifies the error and exits the funtion
+	if(lstat_check(path_name, &st) == -1)
+		return;
+	
+	if((st.st_mode & S_IFMT) == S_IFDIR) { // path es un directorio
+		DIR *d;
+		struct dirent *ent;
+
+		if((d = opendir(path_name)) == NULL) {
+			printf("Could not open %s: %s\n", path_name, strerror(errno));
+			return;
+		}
+		
+		//in this while loop we read the elements that are in a directory
+		while((ent = readdir(d)) != NULL) {
+			if(strcmp(ent->d_name, ".") == 0 || strcmp(ent->d_name, "..") == 0)//we ignore these directories
+				continue;
+			if(ent->d_type != DT_DIR)
+				continue;
+			
+			
+			sprintf(new_path, "%s/%s", path_name, ent->d_name);
+			recb(params, new_path);
+			
+		}
+		
+		closedir(d);
+		
+	}
+	print_dir(params, path_name);
 
 }
+
+
+void cmd_list(char *tr[]){
+	sl_params params;
+	
+	params = aux_stat_list(tr);
+	tr = tr + params.start_of_files;	
+	
+	while(tr[0] != NULL){
+		if(!params.reca && !params.recb)
+			print_dir(params, tr[0]);	
+		else if(params.reca)
+			reca(params, tr[0]);
+		else if(params.recb)
+			recb(params, tr[0]);
+		else
+			printf("Invalid options\n");
+		
+	
+		tr = tr + 1;
+		
+		printf("******************************************************\n");
+	}
+}
+
+
+
+
+
+
+
+void aux_deltree(char *path) {    
+	struct stat st;
+	
+	
+	//gets the status of the path and if it can not it specifies the error and exits the funtion
+	if(lstat_check(path, &st) == -1)
+		return;
+	
+	
+	if((st.st_mode & S_IFMT) == S_IFDIR) { // path es un directorio
+		DIR *d;
+		struct dirent *ent;
+
+		if((d = opendir(path)) == NULL) {
+			printf("Could not open %s: %s\n", path, strerror(errno));
+			return;
+		}
+		
+		//in this while loop we read the elements that are in a directory
+		while((ent = readdir(d)) != NULL) {
+			char new_path[MAX];
+
+			if(strcmp(ent->d_name, ".") == 0 || strcmp(ent->d_name, "..") == 0)//we ignore these directories
+				continue;
+
+			sprintf(new_path, "%s/%s", path, ent->d_name);
+			
+			//we call the function recursively in all the files and directories
+			aux_deltree(new_path);
+		}
+		closedir(d);
+	}
+	
+	/*if it is a file or an empty directory(which it is because we have deleted all of its elements in the while loop)
+	  the funtion remove deletes it*/
+	if(remove(path) == -1) {
+		printf("Could not delete %s: %s\n", path, strerror(errno));
+	}
+
+	printf("Borrar %s\n", path);
+}
+
+
+void cmd_delete(char *tr[]){
+
+	while(tr[0] != NULL){
+	
+		if(remove(tr[0]) == -1) {
+			printf("Could not delete %s: %s\n", tr[0], strerror(errno));
+		}
+		
+		tr = tr + 1;
+	}
+
+}
+
+
+
+void cmd_deltree(char *tr[]){
+	/*This loop call the function aux_deltree(char *path), which deletes a directory recursively, using as a 
+	parameter all of the paths names indicated by the user.*/
+	while(tr[0] != NULL){
+		aux_deltree(tr[0]);
+		tr = tr + 1;
+	}
+}
+
+
 
 
 void cmd_fin(char * tr [], tList *L){
