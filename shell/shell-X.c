@@ -387,10 +387,9 @@ sl_params aux_stat_list(char *tr[]){
 }
 
 
-void format_dir_output(char *tr, char *t){
+void format_dir_output(char *tr){
 	int i = strlen(tr);
 	int j = i - 1;
-	int endt = 0;
 	
 	if(j < 0)
 		return;
@@ -400,91 +399,59 @@ void format_dir_output(char *tr, char *t){
 		if(j < 0)
 			return;
 	}
+	j++;
 	
-	while(j <= i){
-		t[0] = tr[j];
-		endt++;
-		j++;
-	}
-	
+	 strncpy(tr, &tr[j], i - j);
+    	 tr[i - j] = '\0';
 	
 }
 
 
-
-void cmd_stat(char *tr[]){
+void doStat(char *name, sl_params params, bool is_list){
 	
 	struct stat buffer;
-	char acctime[100];
 	struct passwd *uname;
 	struct group *gname;
-	char permissions[12];
-	sl_params params;
+	char *user,*group, permissions[12], enlace[MAX],acctime[100];
+	int n;
 	
-	params = aux_stat_list(tr);
-	tr = tr + params.start_of_files;
 	
-	if(tr[0] == NULL){
-		printf("ERROR: NO parameters.\n");
-		//cmd_carpeta(NULL); preguntar por que no funciona
-	
-		return;	
+	if(lstat(name, &buffer) == -1){
+		printf ("Cannot access %s: %s\n", name,strerror(errno));
+		return;
 	}
 	
+	format_dir_output(name);
 	
-	while(tr[0] != NULL){
-		
-		if(lstat(tr[0], &buffer) == -1){
-			perror("ERROR");
-			tr = tr + 1;
-			
-			if(tr[0] != NULL)
-				continue;
-			else
-				return;
-		}
-		
+	if (!params.lon){
+		printf ("%s: %lld\n",name, (long long) buffer.st_size);
+		return;
+	}
 		
 		//here we get the string of the permissions 
-		ConvierteModo (buffer.st_mode, permissions);
-		permissions[0] = LetraTF(buffer.st_mode);
-		
-		//here we transform the last accestime to a string
+	ConvierteModo (buffer.st_mode, permissions);
+	
+	if(params.acc)
 		strftime(acctime, 100, "%Y/%m/%d-%H:%M",localtime(&buffer.st_atime));
-		
-		
-		// char *t = NULL;
-		//format_dir_output(tr[0], t); arreglar la funcion
-		
-		if(params.lon){
-			
+	else 
+		strftime(acctime, 100, "%Y/%m/%d-%H:%M",localtime(&buffer.st_mtime));	
 			//here we get the user name and the goupname
-			if((uname = getpwuid(buffer.st_uid)) == NULL){
-				printf("Error obtaining the username\n");
-				return;
+	
+	user=(uname = getpwuid(buffer.st_uid)) == NULL?"UNKNOWN":uname->pw_name;
+				
+	group=(gname = getgrgid(buffer.st_gid)) == NULL?"UNKNOWN":gname-> gr_name;
+	
+	printf("%s \t %ld \t (%ld) \t %s \t %s \t %s \t %ld \t %s",
+			 acctime, buffer.st_nlink, buffer.st_ino, user, group, permissions, buffer.st_size, name);
+	
+	if(params.link && S_ISLNK(buffer.st_mode)){
+		n=readlink(name, enlace,MAX);
+		if (n!=-1){
+			enlace[n]='\0';
+			printf ("-->%s \n",enlace);
 			}
-			
-			if((gname = getgrgid(buffer.st_gid)) == NULL){
-				printf("Error obtaining the groupname\n");
-				return;
-			}
-			//we print the information
-			
-			printf("%s \t %ld \t (%ld) \t %s \t %s \t %s \t %ld \t %s\n",
-			 acctime, buffer.st_nlink, buffer.st_ino, uname->pw_name, gname->gr_name, permissions, buffer.st_size, tr[0]);
-			
-		}else{
-			if(params.acc)
-				printf("%s", acctime);
-			if(params.link)
-				printf("preguntar q hacer\n");
-			else
-				printf("%s\n", tr[0]);
-		}
-		
-		
-		tr = tr + 1;
 	}
+	printf("\n");
 	
 	
 }
@@ -514,6 +481,20 @@ void sl_params_to_tr(sl_params params,  char * path, char * tro[]){
 		printf("Error at processing the string in the function sl_params_to_tr");
 	
 }
+
+
+
+void cmd_stat (char *tr[]){
+
+     sl_params params;
+     
+     params = aux_stat_list(tr);
+     tr = tr + params.start_of_files;
+
+     for (int i=0; tr[i]!=NULL; i++)
+     	doStat (tr[i],params, true);
+}
+
 
 
 int lstat_check(char *path, struct stat *st){
@@ -568,7 +549,6 @@ void print_dir(sl_params params, char *path_name){
 	}
 	
 }
-
 
 
 void reca(sl_params params, char *path_name){
