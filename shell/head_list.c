@@ -8,20 +8,21 @@
 #include <string.h>
 #define LNULL NULL
 
-int createNode(tPosL *p) {
+bool createNode(tPosL *p) {
     *p = malloc(sizeof(struct node));
     return *p != NULL;
 }
 
 void CreateEmptyList(tList *L) {
-     createNode(L);
-     (*L)->next = LNULL;
+     if(createNode(L))
+     	(*L)->next = LNULL;
 }
+
 bool isEmptyList(tList L){
     return (L->next == NULL);
 }
 
-bool InsertElement(tList *L, char  *data){
+bool InsertElement(tList *L, char *data){
     // Inserts an element in the List
     tPosL n;
 
@@ -30,35 +31,26 @@ bool InsertElement(tList *L, char  *data){
     if(!createNode(&n))
         return false;
     /*New node values insertion*/
-    n->data.data=strdup(data);
-    /* 
-    n->data.data=malloc (strlen(data)+1);
+    
+    n->data.data=malloc (strlen(data) + 1);
     strcpy (n->data.data,data);
-    */
+    
     n->data.index = 0;
     n->next = LNULL;
 
     //if the list is empty we create the head node, wich points to the first element of the list
-    if(*L == LNULL){
-        if(createNode(L)){
-            (*L)->next = n;
-        }else
-            return false;
-    }
+
+    if((*L)->next == LNULL)
+        (*L)->next = n;
     else{
-        if((*L)->next == LNULL)
-            (*L)->next = n;
-        else{
-        //we insert the element at the end
-            tPosL p;
-            for(p = *L; p->next != LNULL; p = p->next){
-            	n->data.index++;
-            }
-            p->next = n;
+    //we insert the element at the end
+         tPosL p;
+         for(p = *L; p->next != LNULL; p = p->next){
+             n->data.index++;
+         }
+         p->next = n;
         }
 
-        
-    }
     return true;
 }
 
@@ -67,6 +59,9 @@ bool InsertElement(tList *L, char  *data){
 void RemoveElement(tList * L, tPosL p) {
     tPosL i;
     //this function removes an element at a given position, it can't remove the head node
+    if(p == NULL)
+    	return;
+    	
     if(p == *L) {
         return;
     }else if(p->next == NULL) {
@@ -74,11 +69,12 @@ void RemoveElement(tList * L, tPosL p) {
         i->next = NULL;
     }else {
         i = p->next;
-        strcpy(p->data.data,i->data.data);
+       	free(p->data.data);
+       	p->data.data = strdup(i->data.data);
         p->next = i->next;
         p = i;
     }
-
+	 free(p->data.data);
 	 free(p);
 }
 
@@ -101,12 +97,13 @@ void printList(tList L, int num){
 void clearList(tList * L){
     //it removes all the elements except the head node
     tPosL p = (*L)->next;
-	
+    
     while(p != NULL){
         RemoveElement(L, p);
       	p = (*L)->next;
     }
      
+    (*L)->next = NULL;
   
 }
 
@@ -149,8 +146,9 @@ int retLastIndex(tList L){
 
 
 void removeHead(tList *L){
-	if((*L)->next == NULL)
+	if((*L)->next == NULL){
 		free(*L);
+	}
 		
 	else
 		printf("This can only remove the head node not the whole list.");

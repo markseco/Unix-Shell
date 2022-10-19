@@ -24,6 +24,7 @@ typedef tPosL tList;
 
 
 void CreateEmptyList(tList *L);
+bool isEmptyList(tList L);
 bool InsertElement(tList * L, char *data);
 void RemoveElement(tList * L, tPosL p);
 void printList(tList L, int num);

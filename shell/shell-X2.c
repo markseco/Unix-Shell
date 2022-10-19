@@ -429,37 +429,34 @@ void format_str(int size, char *name1, char *name){
 
 }
 
-void doStat(char *name1, sl_params params){
+void doStat(char *name, sl_params params){
 	
 	struct stat buffer;
 	struct passwd *uname = NULL;
 	struct group *gname = NULL;
 	char *user,*group, permissions[12], enlace[MAX],acctime[100];
 	int n;
-	int size = length_name_file(name1);
-	char *name = ""; //= malloc(size *sizeof(char) + 1);
+
 	
-	if(lstat(name1, &buffer) == -1){
-		printf ("Cannot access %s: %s\n", name1,strerror(errno));
+	if(lstat(name, &buffer) == -1){
+		printf ("Cannot access %s: %s\n", name,strerror(errno));
 		return;
 	}
-	
-	
-	format_str(size, name1, name);
 	
 	if (!params.lon){
 		printf ("%s: %ld\n", name, buffer.st_size);
 		return;
 	}
 		
-		//here we get the string of the permissions 
+	//here we get the string of the permissions 
 	ConvierteModo (buffer.st_mode, permissions);
 	
 	if(params.acc)
 		strftime(acctime, 100, "%Y/%m/%d-%H:%M",localtime(&buffer.st_atime));
 	else 
 		strftime(acctime, 100, "%Y/%m/%d-%H:%M",localtime(&buffer.st_mtime));	
-			//here we get the user name and the goupname
+	
+	//here we get the user name and the goupname
 	
 	user=(uname = getpwuid(buffer.st_uid)) == NULL?"UNKNOWN":uname->pw_name;
 				
@@ -469,7 +466,7 @@ void doStat(char *name1, sl_params params){
 			 acctime, buffer.st_nlink, buffer.st_ino, user, group, permissions, buffer.st_size, name);
 	
 	if(params.link && S_ISLNK(buffer.st_mode)){
-		n=readlink(name1, enlace,MAX);
+		n=readlink(name, enlace,MAX);
 		if (n!=-1){
 			enlace[n]='\0';
 			printf ("-->%s \n",enlace);
@@ -537,49 +534,41 @@ int lstat_check(char *path, struct stat *st){
 
 void print_dir(sl_params params, char *path_name){
 
-	struct stat st;
-	char *tro[MAX/2];
-	char new_path[MAX] = "";
-	
-	//gets the status of the path and if it can not it specifies the error and exits the funtion
-	
-	if(lstat(path_name, &st) == -1) {
-		printf("Could not access %s: %s\n", path_name, strerror(errno));
-	        return;    
-	}
-	
-	printf("**************%s\n", path_name);
+	    struct stat st;
+    char *tro[MAX / 2];
+    char new_path[MAX];
 
-	
-	if((st.st_mode & S_IFMT) == S_IFDIR) { // path es un directorio
-		DIR *d;
-		struct dirent *ent;
+    if(lstat(path_name, &st) == -1){
+        perror("ERROR");
+        return;
+    }
 
-		if((d = opendir(path_name)) == NULL) {
-			printf("Could not open %s: %s\n", path_name, strerror(errno));
-			return;
-		}
-		
-		//in this while loop we read the elements that are in a directory
-		while((ent = readdir(d)) != NULL) {
-			if(ent->d_name[0] == '.' && !params.hid)//we ignore hidden directories if we are't asked to show them
-				continue;
-			
-			sprintf(new_path, "%s/%s", path_name, ent->d_name);
-			sl_params_to_tr(params, new_path, tro);
-			
-			cmd_stat(tro);
-			
-		}
-		
-		
-		closedir(d);
-		
-	}else{  
-		sl_params_to_tr(params, path_name, tro);
-		cmd_stat(tro);
-	}
-	
+    printf("*****************************************%s\n", path_name);
+
+    if((st.st_mode & S_IFMT) == S_IFDIR){
+
+        DIR *d = opendir(path_name);
+        struct dirent *ent;
+
+        if(d == NULL) {
+            printf("Could not open %s: %s\n", path_name, strerror(errno));
+            return;
+        }
+
+        while((ent = readdir(d)) != NULL){
+            if(ent->d_name[0] == '.' && !params.hid)
+                continue;
+            sprintf(new_path, "%s/%s", path_name, ent->d_name);
+            sl_params_to_tr(params, new_path, tro);
+             doStat(new_path, params);
+        }
+
+        closedir(d);
+    }else{
+        sl_params_to_tr(params, path_name, tro);
+    }
+   
+    doStat(path_name, params);
 }
 
 
