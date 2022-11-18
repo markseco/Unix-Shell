@@ -1,3 +1,8 @@
+/*
+Diego Dopazo Garcia : diego.dopazo.garcia@udc.es
+Marcos Seco Anderson : marcos.seco.anderson@udc.es
+*/
+
 #define MAX 1024
 #define TAMANO 2048
 
@@ -1111,7 +1116,7 @@ void dumpMemory(void *p, size_t cont) {
 
         printf("\n");
 
-        for (j = 0; j < cont; j++) {
+        for (j = i - cont; j < i; j++) {
             printf("%2x ", arr[j]);
 
         }
