@@ -841,9 +841,12 @@ void do_AllocateCreateshared(char *tr[], tListM *LM) {
 }
 
 void do_Shared(char *tr[], tListM *LM) {
+    void *p;
     if (tr[0] != NULL) {
         key_t key = (key_t) strtoul(tr[0], NULL, 10);
-        ObtenerMemoriaShmget(key, 0, LM);
+        if((p = ObtenerMemoriaShmget(key, 0, LM)) != NULL){
+            printf("Shared memory with key %d in %p\n", key, p);
+        }
     }
 
 }
@@ -1349,6 +1352,7 @@ void cmd_recursiva(char *tr[]) {
 }
 
 
+//esta es la que cambiamos
 
 
 
