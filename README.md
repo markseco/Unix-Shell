@@ -9,8 +9,8 @@ In this repository, you will find the source code for our Unix-like shell projec
 ## Project Overview
 
 - **Description**: This project involved the development and implementation of a Unix-like shell in C, encompassing a wide array of system-level functions and commands.
-- **Key Skills**: The project serves as a testament to our deep system-level programming skills, underscoring our profound understanding of operating systems and low-level programming.
-- **User-Friendly Interface**: We created a user-friendly command-line interface, enabling users to execute essential Unix-like operations effortlessly, emphasizing problem-solving and systems development expertise.
+- **Key Skills**: C programming, memory management, debugging, and system call usage. We also deepened our understanding of operating systems, process management, and data structures.
+
 
 ## Features
 
